@@ -71,48 +71,48 @@
     document.body.appendChild(renderer.domElement);
 
     // Load the fish model
-    let fish = null;
+    // let fish = null;
 
-    function loadFish() {
-      const mtlLoader = new MTLLoader();
-      mtlLoader.load('./media/fish.mtl', (materials) => {
-        materials.preload(); // Prepare materials for use
+    // function loadFish() {
+    //   const mtlLoader = new MTLLoader();
+    //   mtlLoader.load('./media/fish.mtl', (materials) => {
+    //     materials.preload(); // Prepare materials for use
 
-        const objLoader = new OBJLoader();
-        objLoader.setMaterials(materials); // Apply materials to OBJLoader
-        objLoader.load('./media/fish.obj', (loadedObject) => {
-          fish = loadedObject;
-          fish.scale.set(0.3, 0.3, 0.3); //0.5, 0.5, 0.5);
-          fish.position.set(0, 0.15, -1);
-          fish.rotation.set(0,0,0);
-          scene.add(fish);
+    //     const objLoader = new OBJLoader();
+    //     objLoader.setMaterials(materials); // Apply materials to OBJLoader
+    //     objLoader.load('./media/fish.obj', (loadedObject) => {
+    //       fish = loadedObject;
+    //       fish.scale.set(0.3, 0.3, 0.3); //0.5, 0.5, 0.5);
+    //       fish.position.set(0, 0.15, -1);
+    //       fish.rotation.set(0,0,0);
+    //       scene.add(fish);
 
-          fish.traverse((child) => {
-            if (child.isMesh) {
-              child.material.transparent = true; // Ensure the material is transparent
-            }
-          });
+    //       fish.traverse((child) => {
+    //         if (child.isMesh) {
+    //           child.material.transparent = true; // Ensure the material is transparent
+    //         }
+    //       });
 
-          fish.renderOrder = 800;
+    //       fish.renderOrder = 800;
           
-        });
-      });
-    }
+    //     });
+    //   });
+    // }
     
-    function removeFish() {
-      scene.remove(fish);
+    // function removeFish() {
+    //   scene.remove(fish);
         
-      if (fish.geometry) fish.geometry.dispose();
-      if (fish.material) {
-        if (Array.isArray(fish.material)) {
-          fish.material.forEach((m) => m.dispose());
-        } else {
-          fish.material.dispose();
-        }
-      }
-    }
+    //   if (fish.geometry) fish.geometry.dispose();
+    //   if (fish.material) {
+    //     if (Array.isArray(fish.material)) {
+    //       fish.material.forEach((m) => m.dispose());
+    //     } else {
+    //       fish.material.dispose();
+    //     }
+    //   }
+    // }
     
-    loadFish();
+    // loadFish();
 
     // Enable AR button
     document.body.appendChild(ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'dom-overlay'], domOverlay: { root: document.body } }));
@@ -258,12 +258,12 @@
     scene.add(sphere);
 
     // AUDIO PLAYBACK
-    const audio = new Audio('media/nov24-xr.mp3');
+    const audio = new Audio('media/ding.mp3');
 
     // Handle XR Session for passthrough
     renderer.xr.addEventListener('sessionstart', () => {
       scene.add(buttonMesh);
-      
+
       const session = renderer.xr.getSession();
       if (session.environmentBlendMode === "opaque") {
         console.log("Passthrough enabled on Meta Quest 2.");
@@ -272,31 +272,31 @@
       }
 
       console.log('program will start after a 5-second delay');
-          
-      // Add a 5-second delay before playing the audio
-      setTimeout(() => {
-        audio.play().then(() => {
-          stoppingRotation = true;
-          console.log('Start playing...');
-          startDive = true;
-          clock.start();
 
-        }).catch((err) => {
+      // Play ding.mp3 every 5 seconds
+      setTimeout(() => {
+        audio.play().catch((err) => {
           console.error('Error playing audio:', err);
         });
-      }, START_DELAY*1000); // 5000 milliseconds = 5 seconds
-
-      // start stopping now
-      // stoppingRotation = true;
+        // Set up interval for repeating ding
+        audio.dingInterval = setInterval(() => {
+          audio.currentTime = 0;
+          audio.play().catch((err) => {
+            console.error('Error playing audio:', err);
+          });
+        }, 5000);
+      }, START_DELAY * 1000); // 5000 milliseconds = 5 seconds
     });
 
-
+    // Stop the interval and audio on session end
     renderer.xr.addEventListener('sessionend', () => {
       console.log('AR session ended');
-      
-      // Pause the audio when the AR session ends
       audio.pause();
       audio.currentTime = 0; // Reset to the start
+      if (audio.dingInterval) {
+        clearInterval(audio.dingInterval);
+        audio.dingInterval = null;
+      }
     });
 
 
@@ -350,153 +350,87 @@
 
     // Animation loop
     function animate() {
+      let phaseStart = performance.now();
+      let phase = 0; // 0: transparent, 1: opaque blue
+
       renderer.setAnimationLoop(() => {
-        
-        // if (isARMode) {
-        if (startDive) {
-          // Update fade effect
-          const delta = clock.getDelta();
+        const now = performance.now();
+        const elapsed = (now - phaseStart) / 1000; // seconds
 
-          // fadeProgress += fadeDirection * delta / 2.5; // Full cycle takes 5 seconds (2.5 seconds each way)
-          fadeProgress += fadeDirection * delta / TIME_TO_OPAQUE; // Full cycle takes 5 seconds (2.5 seconds each way)
-          fadeProgress = THREE.MathUtils.clamp(fadeProgress, 0, 1); // Clamp between 0 and 1
-
-          // Update sphere opacity for fade effect
-          sphereMaterial.uniforms.uOpacity.value = START_OPACITY*fadeProgress;
-
-          // Update overlay opacity
-          // overlayMaterial.uniforms.uOpacity.value = fadeProgress;
-
-          // Update fish opacity
-          if (fish) {
-            fish.traverse((child) => {
-              if (child.isMesh) {
-                child.material.opacity = 1.0 - fadeProgress; // Fade out the fish
-              }
-            });
-          }
-
-          // Hide the fish completely when fully faded
-          if (fadeProgress === 1) {
-            startDive = false;
-            waitForDescent = true;
-            fish.visible = false;
-          }
-
-          // // Reverse direction at the edges
-          // if (fadeProgress === 0 || fadeProgress === 1) fadeDirection *= -1;
+        // Play ding just before opacity shifts (at 4.9s)
+        if (elapsed > 4.9 && elapsed < 5.1 && !audio._playedForThisPhase) {
+          audio.currentTime = 0;
+          audio.play().catch((err) => {
+            console.error('Error playing audio:', err);
+          });
+          audio._playedForThisPhase = true;
         }
 
-        if (waitForDescent) {
-          const elapsedTime = clock.getElapsedTime();
-          // console.log(elapsedTime);
-
-          if (elapsedTime > DIVESTART) {
-            diveClock = new THREE.Clock();
-            bDescending = true;
-            waitForDescent = false;
-            
-            // // Reset opacity to 100%
-            // sphereMaterial.uniforms.uOpacity.value = 1.0;
-
-            console.log(elapsedTime, 'starting descent...')
-
-            LIGHTBLUE = new THREE.Color(0x87ceeb);
-            DARKBLUE = new THREE.Color(0x00008b);
-            BLACK = new THREE.Color(0x000000); // Black
-          }
+        // Alternate every 5 seconds
+        if (elapsed > 5) {
+          phase = (phase + 1) % 2;
+          phaseStart = now;
+          audio._playedForThisPhase = false;
         }
 
-        if (bDescending) {
-          const elapsedTime = diveClock.getElapsedTime();
-          const lerpFactor = Math.min((elapsedTime / DIVELENGTH), 1.0); // Lerp progress (clamped between 0 and 1)
-          const easedFactor = lerpFactor * lerpFactor * (3 - 2 * lerpFactor); // Smoothstep easing
-          // const easedFactor = lerpFactor;
-
-          // fade in opacity as we start descending
-          let clampedTime = THREE.MathUtils.clamp(elapsedTime / (TIME_TO_OPAQUE_DIVE), 0, 1.00)
-          let lerpedOpacity = Math.max(START_OPACITY, clampedTime);
-          sphereMaterial.uniforms.uOpacity.value = lerpedOpacity;
-          // console.log(START_OPACITY, elapsedTime, clampedTime, lerpedOpacity);
-
-          sphereMaterial.uniforms.uTopColor.value.lerpColors(LIGHTBLUE, BLACK, easedFactor);
-          sphereMaterial.uniforms.uBottomColor.value.lerpColors(DARKBLUE, BLACK, easedFactor);
-          
-          // console.log(elapsedTime, ": ", lerpFactor, easedFactor, sphereMaterial.uniforms.uTopColor.value);
-          
-          if (elapsedTime > DIVELENGTH) {
-            bDescending = false;
-            console.log(elapsedTime, 'done descending...')
-            waitForAscent = true;
-          }
-        }
-
-        if (waitForAscent) {
-          const elapsedTime = clock.getElapsedTime();
-          // console.log(elapsedTime);
-
-          if (elapsedTime > SURFACESTART) {
-            diveClock = new THREE.Clock();
-            bAscending = true;
-            waitForAscent = false;
-            
-            // // Reset opacity to 100%
-            // sphereMaterial.uniforms.uOpacity.value = 1.0;
-
-            console.log(elapsedTime, 'starting ascent...')
-
-            LIGHTBLUE = new THREE.Color(0x87ceeb);
-            DARKBLUE = new THREE.Color(0x00008b);
-            BLACK = new THREE.Color(0x000000);
-          }
-        }
-
-        if (bAscending) {
-          const elapsedTime = diveClock.getElapsedTime();
-          const lerpFactor = Math.min(elapsedTime / ASCENTLENGTH, 1.0); // Lerp progress (clamped between 0 and 1)
-          // const easedFactor = lerpFactor;
-          const easedFactor = lerpFactor * lerpFactor * (3 - 2 * lerpFactor); // Smoothstep easing
-
-          // fade in opacity as we start descending
-          // let clampedTime = THREE.MathUtils.clamp(elapsedTime / (ASCENTLENGTH*0.5), 0, 0.99)
-          // let lerpedOpacity = Math.max(START_OPACITY, clampedTime);
-          // sphereMaterial.uniforms.uOpacity.value = lerpedOpacity;
-          // console.log(START_OPACITY, elapsedTime, clampedTime, lerpedOpacity);
+        if (phase === 0) {
+          // Transparent passthrough
+          sphereMaterial.uniforms.uOpacity.value = 0.0;
+        } else {
+          // Opaque blue
+          sphereMaterial.uniforms.uTopColor.value.copy(LIGHTBLUE);
+          sphereMaterial.uniforms.uBottomColor.value.copy(DARKBLUE);
           sphereMaterial.uniforms.uOpacity.value = 0.99;
-
-          // Lerp colors back to yellow
-          sphereMaterial.uniforms.uTopColor.value.lerpColors(BLACK, LIGHTBLUE, easedFactor);
-          sphereMaterial.uniforms.uBottomColor.value.lerpColors(BLACK, DARKBLUE, easedFactor);
-
-          // console.log(elapsedTime, lerpFactor, easedFactor, sphereMaterial.uniforms.uTopColor.value);
-          
-          if (elapsedTime > ASCENTLENGTH) {
-            bAscending = false;
-            console.log(elapsedTime, 'done ascending...')
-            bWaitForEnd = true;
-          }
         }
 
-        if (bWaitForEnd) {
-          const elapsedTime = clock.getElapsedTime();
-          // console.log(elapsedTime);
-
-          if (elapsedTime > TOTAL_RUNTIME) {
-            console.log(elapsedTime, "finished");
-            bWaitForEnd = false;
-            resetToStartScreen();
-          }
-        }
-        // Rotate the fish
-        if (fish != null && doRotate) {
-          fish.rotation.x = (fish.rotation.x + 0.01) % twoPi;
-          fish.rotation.y = (fish.rotation.y + 0.01) % twoPi;
-        }
-
-        // Render the scene
         renderer.render(scene, camera);
       });
     }
+
+    // --- WebSocket Integration ---
+    let wsMessage = "Waiting for message...";
+    let wsTextMesh = null;
+
+    function createTextMesh(text) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 1024;
+      canvas.height = 256;
+
+      context.fillStyle = 'black';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = 'white';
+      context.font = '64px sans-serif';
+      context.fillText(text, 50, 150);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
+      const geometry = new THREE.PlaneGeometry(2, 0.5);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    function updateTextMesh(text) {
+      if (wsTextMesh) scene.remove(wsTextMesh);
+      wsTextMesh = createTextMesh(text);
+      wsTextMesh.position.set(0, 2, -2);
+      scene.add(wsTextMesh);
+    }
+
+    function connectWebSocket() {
+      const socket = new WebSocket('ws://localhost:8080');
+      socket.onmessage = (event) => {
+        wsMessage = event.data;
+        updateTextMesh(wsMessage);
+      };
+      socket.onopen = () => console.log("WebSocket connected");
+      socket.onerror = (err) => console.error("WebSocket error", err);
+      socket.onclose = () => console.log("WebSocket closed");
+    }
+
+    connectWebSocket();
+    updateTextMesh(wsMessage);
+
+    // --- End WebSocket Integration ---
 
     animate();
   </script>

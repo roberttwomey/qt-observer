@@ -422,6 +422,7 @@
       wsTextMesh = createTextMesh(text);
       wsTextMesh.position.set(0, -0.25, -2);
       wsTextMesh.geometry.center();
+      wsTextMesh.renderOrder = 1001; // Ensure it's rendered on top of the sphere
       scene.add(wsTextMesh);
     }
 

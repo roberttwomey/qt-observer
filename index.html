@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fish Sound Bath</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: grey;
+    }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/ARButton.js';
+    // import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/OBJLoader.js';
+    // import { MTLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/MTLLoader.js';
+    import { OBJLoader } from './OBJLoader.js';
+    import { MTLLoader } from './MTLLoader.js';
+
+    let doRotate = true;
+    let stoppingRotation = false;
+    let startDive = false;
+    let waitForDescent = false;
+    let bDescending = false;
+    let waitForAscent = false;
+    let bAscending = false;
+    let bWaitForEnd = false;
+
+    let diveClock; 
+
+    // full length
+    const START_DELAY = 5.0;
+    const TIME_TO_OPAQUE = 10.0;
+    const START_OPACITY = 0.9;
+    const TIME_TO_OPAQUE_DIVE = 3.0;
+    const DIVESTART = 107;
+    const DIVELENGTH = 35;
+    const SURFACESTART = 493;
+    const ASCENTLENGTH = 24;
+    const TOTAL_RUNTIME = 560;
+
+    // quick
+    // const START_DELAY = 1.0;
+    // const TIME_TO_OPAQUE = 10.0;
+    // const START_OPACITY = 0.9;
+    // const TIME_TO_OPAQUE_DIVE = 3.0;
+    // const DIVESTART = 10.0;
+    // const DIVELENGTH = 10.0;
+    // const SURFACESTART = 30;
+    // const ASCENTLENGTH = 10.0;
+    // const TOTAL_RUNTIME = 50;
+
+    let LIGHTBLUE = new THREE.Color(0x87ceeb);
+    let DARKBLUE = new THREE.Color(0x00008b);
+    let BLACK = new THREE.Color(0x000000);
+    
+    const twoPi = 2 * Math.PI;
+    // global clock
+    const clock = new THREE.Clock();
+    
+    // Set up scene, camera, and renderer
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // Load the fish model
+    let fish = null;
+
+    function loadFish() {
+      const mtlLoader = new MTLLoader();
+      mtlLoader.load('./media/fish.mtl', (materials) => {
+        materials.preload(); // Prepare materials for use
+
+        const objLoader = new OBJLoader();
+        objLoader.setMaterials(materials); // Apply materials to OBJLoader
+        objLoader.load('./media/fish.obj', (loadedObject) => {
+          fish = loadedObject;
+          fish.scale.set(0.3, 0.3, 0.3); //0.5, 0.5, 0.5);
+          fish.position.set(0, 0.15, -1);
+          fish.rotation.set(0,0,0);
+          scene.add(fish);
+
+          fish.traverse((child) => {
+            if (child.isMesh) {
+              child.material.transparent = true; // Ensure the material is transparent
+            }
+          });
+
+          fish.renderOrder = 800;
+          
+        });
+      });
+    }
+    
+    function removeFish() {
+      scene.remove(fish);
+        
+      if (fish.geometry) fish.geometry.dispose();
+      if (fish.material) {
+        if (Array.isArray(fish.material)) {
+          fish.material.forEach((m) => m.dispose());
+        } else {
+          fish.material.dispose();
+        }
+      }
+    }
+    
+    loadFish();
+
+    // Enable AR button
+    document.body.appendChild(ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'dom-overlay'], domOverlay: { root: document.body } }));
+
+    // Add lighting to the scene
+    const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft ambient light
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    // Create an Exit button below the fish
+    const buttonGeometry = new THREE.PlaneGeometry(0.2, 0.1);
+    const buttonCanvas = document.createElement('canvas');
+    buttonCanvas.width = 256;
+    buttonCanvas.height = 128;
+
+    const ctx = buttonCanvas.getContext('2d');
+
+    // Clear the canvas for a transparent background
+    // ctx.clearRect(0, 0, buttonCanvas.width, buttonCanvas.height);
+
+    // Draw a rounded rectangle as the background
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Draw the gray button with rounded corners
+    // ctx.fillStyle = '#808080'; // Gray color
+    ctx.fillStyle = '#000011'; // Blue color
+    drawRoundedRect(ctx, 0, 0, 256, 128, 40); // Rounded corners with a radius of 20
+
+    // Add white text
+    ctx.fillStyle = '#101010';//'#ffffff'; // White color
+    ctx.font = '60px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('restart', 128, 64);
+
+    const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
+    const buttonMaterial = new THREE.MeshBasicMaterial({ map: buttonTexture, transparent: true });
+    const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
+
+    buttonMesh.position.set(0, -0.45, -0.5); // Position the button directly on the floor
+    buttonMesh.rotation.set(-45, 0, 0);
+    // scene.add(buttonMesh);
+
+    buttonMesh.renderOrder = 999; // Set a high render order
+    
+    // Create a raycaster and an array to store interactable objects
+    const raycaster = new THREE.Raycaster();
+    const intersectableObjects = [buttonMesh];
+
+    // Add controller handling
+    const controller1 = renderer.xr.getController(0);
+    const controller2 = renderer.xr.getController(1);
+
+    // Add helper visuals for the controllers
+    const controllerGeometry = new THREE.CylinderGeometry(0.01, 0.01, 0.05, 32);
+    const controllerMaterial = new THREE.MeshBasicMaterial({ color: 0x000088 });
+    const controllerMesh1 = new THREE.Mesh(controllerGeometry, controllerMaterial);
+    const controllerMesh2 = new THREE.Mesh(controllerGeometry, controllerMaterial);
+
+    controller1.add(controllerMesh1);
+    controller2.add(controllerMesh2);
+
+    scene.add(controller1);
+    scene.add(controller2);
+
+    // Check for interactions
+    function handleController(controller) {
+      const tempMatrix = new THREE.Matrix4();
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+      raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const intersects = raycaster.intersectObjects(intersectableObjects);
+      if (intersects.length > 0) {
+        const intersectedObject = intersects[0].object;
+        if (intersectedObject === buttonMesh) {
+          console.log('Exit button clicked via controller');
+          // renderer.xr.getSession().end(); // Exit the XR session
+          // Reset the application to the starting screen
+          renderer.xr.getSession().end().then(() => {
+            resetToStartScreen();
+          });
+        }
+      }
+    }
+
+    // Add interaction detection to controllers
+    controller1.addEventListener('selectstart', () => handleController(controller1));
+    controller2.addEventListener('selectstart', () => handleController(controller2));
+
+    // Graphics Elements
+
+    // Create a large sphere with a countershaded material
+    const sphereGeometry = new THREE.SphereGeometry(5, 64, 64); // High segment count for smooth shading
+    const sphereMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTopColor: { value: LIGHTBLUE}, // Light blue (sky-like)
+        uBottomColor: { value: DARKBLUE}, // Dark blue
+        uOpacity: { value: 0 }, // Start fully transparent
+      },
+      vertexShader: `
+        varying vec3 vPosition;
+        void main() {
+          vPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uTopColor;
+        uniform vec3 uBottomColor;
+        uniform float uOpacity;
+        varying vec3 vPosition;
+
+        void main() {
+          // Map y-position of the sphere to a gradient
+          float gradient = (vPosition.y + 5.0) / 10.0; // Normalize y from -5 to 5
+          gradient = clamp(gradient, 0.0, 1.0); // Ensure gradient stays within [0, 1]
+          vec3 color = mix(uBottomColor, uTopColor, gradient); // Interpolate between colors
+          gl_FragColor = vec4(color, uOpacity); // Apply opacity
+        }
+      `,
+      side: THREE.BackSide, // Render only the inside of the sphere
+      transparent: true, // Enable transparency for fading
+    });
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    scene.add(sphere);
+
+    // AUDIO PLAYBACK
+    const audio = new Audio('media/nov24-xr.mp3');
+
+    // Handle XR Session for passthrough
+    renderer.xr.addEventListener('sessionstart', () => {
+      scene.add(buttonMesh);
+      
+      const session = renderer.xr.getSession();
+      if (session.environmentBlendMode === "opaque") {
+        console.log("Passthrough enabled on Meta Quest 2.");
+      } else {
+        console.error("Passthrough is not supported.");
+      }
+
+      console.log('program will start after a 5-second delay');
+          
+      // Add a 5-second delay before playing the audio
+      setTimeout(() => {
+        audio.play().then(() => {
+          stoppingRotation = true;
+          console.log('Start playing...');
+          startDive = true;
+          clock.start();
+
+        }).catch((err) => {
+          console.error('Error playing audio:', err);
+        });
+      }, START_DELAY*1000); // 5000 milliseconds = 5 seconds
+
+      // start stopping now
+      // stoppingRotation = true;
+    });
+
+
+    renderer.xr.addEventListener('sessionend', () => {
+      console.log('AR session ended');
+      
+      // Pause the audio when the AR session ends
+      audio.pause();
+      audio.currentTime = 0; // Reset to the start
+    });
+
+
+    // Function to reset to the starting screen
+    function resetToStartScreen() {
+      console.log('Resetting to starting screen...');
+      
+      // Remove all 3D objects from the scene
+      // while (scene.children.length > 0) {
+      //   const object = scene.children[0];
+      //   scene.remove(object);
+      //   if (object.geometry) object.geometry.dispose();
+      //   if (object.material) {
+      //     if (Array.isArray(object.material)) {
+      //       object.material.forEach((m) => m.dispose());
+      //     } else {
+      //       object.material.dispose();
+      //     }
+      //   }
+      // }
+
+      
+      // Reset camera position and scene state
+      // camera.position.set(0, 0, 0);
+      // camera.lookAt(0, 0, -1);
+
+      // Optionally reload the page to completely reset
+      location.reload(); // Uncomment this line to reload the entire page
+
+      // LIGHTBLUE = new THREE.Color(0x87ceeb);
+      // DARKBLUE = new THREE.Color(0x00008b);
+      
+      // // Update sphere opacity for fade effect
+      // fadeProgress = 0;
+      // sphereMaterial.uniforms.uOpacity.value = 0;
+      // sphereMaterial.uniforms.uTopColor.value = LIGHTBLUE;
+      // sphereMaterial.uniforms.uBottomColor.value = DARKBLUE;
+
+      // removeFish();
+
+      // loadFish();
+
+      // stoppingRotation = true;
+      // console.log('Restart playing...');
+      // startDive = true;
+      // clock.start();
+    }
+
+    let fadeDirection = 1; // 1 for fading to blue, -1 for fading back to transparent
+    let fadeProgress = 0; // Progress of the fade effect (0 to 1)
+
+    // Animation loop
+    function animate() {
+      renderer.setAnimationLoop(() => {
+        
+        // if (isARMode) {
+        if (startDive) {
+          // Update fade effect
+          const delta = clock.getDelta();
+
+          // fadeProgress += fadeDirection * delta / 2.5; // Full cycle takes 5 seconds (2.5 seconds each way)
+          fadeProgress += fadeDirection * delta / TIME_TO_OPAQUE; // Full cycle takes 5 seconds (2.5 seconds each way)
+          fadeProgress = THREE.MathUtils.clamp(fadeProgress, 0, 1); // Clamp between 0 and 1
+
+          // Update sphere opacity for fade effect
+          sphereMaterial.uniforms.uOpacity.value = START_OPACITY*fadeProgress;
+
+          // Update overlay opacity
+          // overlayMaterial.uniforms.uOpacity.value = fadeProgress;
+
+          // Update fish opacity
+          if (fish) {
+            fish.traverse((child) => {
+              if (child.isMesh) {
+                child.material.opacity = 1.0 - fadeProgress; // Fade out the fish
+              }
+            });
+          }
+
+          // Hide the fish completely when fully faded
+          if (fadeProgress === 1) {
+            startDive = false;
+            waitForDescent = true;
+            fish.visible = false;
+          }
+
+          // // Reverse direction at the edges
+          // if (fadeProgress === 0 || fadeProgress === 1) fadeDirection *= -1;
+        }
+
+        if (waitForDescent) {
+          const elapsedTime = clock.getElapsedTime();
+          // console.log(elapsedTime);
+
+          if (elapsedTime > DIVESTART) {
+            diveClock = new THREE.Clock();
+            bDescending = true;
+            waitForDescent = false;
+            
+            // // Reset opacity to 100%
+            // sphereMaterial.uniforms.uOpacity.value = 1.0;
+
+            console.log(elapsedTime, 'starting descent...')
+
+            LIGHTBLUE = new THREE.Color(0x87ceeb);
+            DARKBLUE = new THREE.Color(0x00008b);
+            BLACK = new THREE.Color(0x000000); // Black
+          }
+        }
+
+        if (bDescending) {
+          const elapsedTime = diveClock.getElapsedTime();
+          const lerpFactor = Math.min((elapsedTime / DIVELENGTH), 1.0); // Lerp progress (clamped between 0 and 1)
+          const easedFactor = lerpFactor * lerpFactor * (3 - 2 * lerpFactor); // Smoothstep easing
+          // const easedFactor = lerpFactor;
+
+          // fade in opacity as we start descending
+          let clampedTime = THREE.MathUtils.clamp(elapsedTime / (TIME_TO_OPAQUE_DIVE), 0, 1.00)
+          let lerpedOpacity = Math.max(START_OPACITY, clampedTime);
+          sphereMaterial.uniforms.uOpacity.value = lerpedOpacity;
+          // console.log(START_OPACITY, elapsedTime, clampedTime, lerpedOpacity);
+
+          sphereMaterial.uniforms.uTopColor.value.lerpColors(LIGHTBLUE, BLACK, easedFactor);
+          sphereMaterial.uniforms.uBottomColor.value.lerpColors(DARKBLUE, BLACK, easedFactor);
+          
+          // console.log(elapsedTime, ": ", lerpFactor, easedFactor, sphereMaterial.uniforms.uTopColor.value);
+          
+          if (elapsedTime > DIVELENGTH) {
+            bDescending = false;
+            console.log(elapsedTime, 'done descending...')
+            waitForAscent = true;
+          }
+        }
+
+        if (waitForAscent) {
+          const elapsedTime = clock.getElapsedTime();
+          // console.log(elapsedTime);
+
+          if (elapsedTime > SURFACESTART) {
+            diveClock = new THREE.Clock();
+            bAscending = true;
+            waitForAscent = false;
+            
+            // // Reset opacity to 100%
+            // sphereMaterial.uniforms.uOpacity.value = 1.0;
+
+            console.log(elapsedTime, 'starting ascent...')
+
+            LIGHTBLUE = new THREE.Color(0x87ceeb);
+            DARKBLUE = new THREE.Color(0x00008b);
+            BLACK = new THREE.Color(0x000000);
+          }
+        }
+
+        if (bAscending) {
+          const elapsedTime = diveClock.getElapsedTime();
+          const lerpFactor = Math.min(elapsedTime / ASCENTLENGTH, 1.0); // Lerp progress (clamped between 0 and 1)
+          // const easedFactor = lerpFactor;
+          const easedFactor = lerpFactor * lerpFactor * (3 - 2 * lerpFactor); // Smoothstep easing
+
+          // fade in opacity as we start descending
+          // let clampedTime = THREE.MathUtils.clamp(elapsedTime / (ASCENTLENGTH*0.5), 0, 0.99)
+          // let lerpedOpacity = Math.max(START_OPACITY, clampedTime);
+          // sphereMaterial.uniforms.uOpacity.value = lerpedOpacity;
+          // console.log(START_OPACITY, elapsedTime, clampedTime, lerpedOpacity);
+          sphereMaterial.uniforms.uOpacity.value = 0.99;
+
+          // Lerp colors back to yellow
+          sphereMaterial.uniforms.uTopColor.value.lerpColors(BLACK, LIGHTBLUE, easedFactor);
+          sphereMaterial.uniforms.uBottomColor.value.lerpColors(BLACK, DARKBLUE, easedFactor);
+
+          // console.log(elapsedTime, lerpFactor, easedFactor, sphereMaterial.uniforms.uTopColor.value);
+          
+          if (elapsedTime > ASCENTLENGTH) {
+            bAscending = false;
+            console.log(elapsedTime, 'done ascending...')
+            bWaitForEnd = true;
+          }
+        }
+
+        if (bWaitForEnd) {
+          const elapsedTime = clock.getElapsedTime();
+          // console.log(elapsedTime);
+
+          if (elapsedTime > TOTAL_RUNTIME) {
+            console.log(elapsedTime, "finished");
+            bWaitForEnd = false;
+            resetToStartScreen();
+          }
+        }
+        // Rotate the fish
+        if (fish != null && doRotate) {
+          fish.rotation.x = (fish.rotation.x + 0.01) % twoPi;
+          fish.rotation.y = (fish.rotation.y + 0.01) % twoPi;
+        }
+
+        // Render the scene
+        renderer.render(scene, camera);
+      });
+    }
+
+    animate();
+  </script>
+</body>
+</html>

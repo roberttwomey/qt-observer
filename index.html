@@ -54,9 +54,10 @@
     // const ASCENTLENGTH = 10.0;
     // const TOTAL_RUNTIME = 50;
 
-    let LIGHTBLUE = new THREE.Color(0x87ceeb);
-    let DARKBLUE = new THREE.Color(0x00008b);
-    let BLACK = new THREE.Color(0x000000);
+    // let LIGHTBLUE = new THREE.Color(0x87ceeb);
+    // let DARKBLUE = new THREE.Color(0x00008b);
+    // let BLACK = new THREE.Color(0x000000);
+    let GRAY = new THREE.Color(0x888888);
     
     const twoPi = 2 * Math.PI;
     // global clock
@@ -162,7 +163,7 @@
     ctx.font = '60px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('restart', 128, 64);
+    ctx.fillText('reload', 128, 64);
 
     const buttonTexture = new THREE.CanvasTexture(buttonCanvas);
     const buttonMaterial = new THREE.MeshBasicMaterial({ map: buttonTexture, transparent: true });
@@ -226,8 +227,10 @@
     const sphereGeometry = new THREE.SphereGeometry(5, 64, 64); // High segment count for smooth shading
     const sphereMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uTopColor: { value: LIGHTBLUE}, // Light blue (sky-like)
-        uBottomColor: { value: DARKBLUE}, // Dark blue
+        // uTopColor: { value: LIGHTBLUE}, // Light blue (sky-like)
+        // uBottomColor: { value: DARKBLUE}, // Dark blue
+        uTopColor: { value: GRAY },
+        uBottomColor: { value: GRAY },
         uOpacity: { value: 0 }, // Start fully transparent
       },
       vertexShader: `
@@ -245,10 +248,11 @@
 
         void main() {
           // Map y-position of the sphere to a gradient
-          float gradient = (vPosition.y + 5.0) / 10.0; // Normalize y from -5 to 5
-          gradient = clamp(gradient, 0.0, 1.0); // Ensure gradient stays within [0, 1]
-          vec3 color = mix(uBottomColor, uTopColor, gradient); // Interpolate between colors
-          gl_FragColor = vec4(color, uOpacity); // Apply opacity
+          // float gradient = (vPosition.y + 5.0) / 10.0; // Normalize y from -5 to 5
+          // gradient = clamp(gradient, 0.0, 1.0); // Ensure gradient stays within [0, 1]
+          // vec3 color = mix(uBottomColor, uTopColor, gradient); // Interpolate between colors
+          // gl_FragColor = vec4(color, uOpacity); // Apply opacity
+          gl_FragColor = vec4(uTopColor, uOpacity); // Use neutral gray, no gradation
         }
       `,
       side: THREE.BackSide, // Render only the inside of the sphere
@@ -273,19 +277,19 @@
 
       console.log('program will start after a 5-second delay');
 
-      // Play ding.mp3 every 5 seconds
-      setTimeout(() => {
-        audio.play().catch((err) => {
-          console.error('Error playing audio:', err);
-        });
-        // Set up interval for repeating ding
-        audio.dingInterval = setInterval(() => {
-          audio.currentTime = 0;
-          audio.play().catch((err) => {
-            console.error('Error playing audio:', err);
-          });
-        }, 5000);
-      }, START_DELAY * 1000); // 5000 milliseconds = 5 seconds
+      // // Play ding.mp3 every 5 seconds
+      // setTimeout(() => {
+      //   audio.play().catch((err) => {
+      //     console.error('Error playing audio:', err);
+      //   });
+      //   // Set up interval for repeating ding
+      //   audio.dingInterval = setInterval(() => {
+      //     audio.currentTime = 0;
+      //     audio.play().catch((err) => {
+      //       console.error('Error playing audio:', err);
+      //     });
+      //   }, 5000);
+      // }, START_DELAY * 1000); // 5000 milliseconds = 5 seconds
     });
 
     // Stop the interval and audio on session end
@@ -348,79 +352,95 @@
     let fadeDirection = 1; // 1 for fading to blue, -1 for fading back to transparent
     let fadeProgress = 0; // Progress of the fade effect (0 to 1)
 
-    // Animation loop
-    function animate() {
-      let phaseStart = performance.now();
-      let phase = 0; // 0: transparent, 1: opaque blue
+    // // Animation loop
+    // function animate() {
+    //   let phaseStart = performance.now();
+    //   let phase = 0; // 0: transparent, 1: opaque blue
 
-      renderer.setAnimationLoop(() => {
-        const now = performance.now();
-        const elapsed = (now - phaseStart) / 1000; // seconds
+    //   renderer.setAnimationLoop(() => {
+    //     const now = performance.now();
+    //     const elapsed = (now - phaseStart) / 1000; // seconds
 
-        // Play ding just before opacity shifts (at 4.9s)
-        if (elapsed > 4.9 && elapsed < 5.1 && !audio._playedForThisPhase) {
-          audio.currentTime = 0;
-          audio.play().catch((err) => {
-            console.error('Error playing audio:', err);
-          });
-          audio._playedForThisPhase = true;
-        }
+    //     // Alternate every 5 seconds
+    //     if (elapsed > 5) {
+    //       phase = (phase + 1) % 2;
+    //       phaseStart = now;
 
-        // Alternate every 5 seconds
-        if (elapsed > 5) {
-          phase = (phase + 1) % 2;
-          phaseStart = now;
-          audio._playedForThisPhase = false;
-        }
+    //       // Play ding exactly when opacity changes
+    //       audio.currentTime = 0;
+    //       audio.play().catch((err) => {
+    //         console.error('Error playing audio:', err);
+    //       });
+    //     }
 
-        if (phase === 0) {
-          // Transparent passthrough
-          sphereMaterial.uniforms.uOpacity.value = 0.0;
-        } else {
-          // Opaque blue
-          sphereMaterial.uniforms.uTopColor.value.copy(LIGHTBLUE);
-          sphereMaterial.uniforms.uBottomColor.value.copy(DARKBLUE);
-          sphereMaterial.uniforms.uOpacity.value = 0.99;
-        }
+    //     if (phase === 0) {
+    //       // Transparent passthrough
+    //       sphereMaterial.uniforms.uOpacity.value = 0.0;
+    //     } else {
+    //       // Opaque gray
+    //       // sphereMaterial.uniforms.uTopColor.value.copy(LIGHTBLUE);
+    //       // sphereMaterial.uniforms.uBottomColor.value.copy(DARKBLUE);
+    //       sphereMaterial.uniforms.uTopColor.value.copy(GRAY);
+    //       sphereMaterial.uniforms.uBottomColor.value.copy(GRAY);
+    //       sphereMaterial.uniforms.uOpacity.value = 0.99;
+    //     }
 
-        renderer.render(scene, camera);
-      });
-    }
+    //     renderer.render(scene, camera);
+    //   });
+    // }
 
     // --- WebSocket Integration ---
     let wsMessage = "Waiting for message...";
     let wsTextMesh = null;
+    let wsTextBgColor = '#888888'; // Track current background color
+    let forceTransparent = null;   // null: auto, true: force transparent, false: force opaque
 
-    function createTextMesh(text) {
+    function createTextMesh(text, bgColor = 'rgba(0,0,0,0)') {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.width = 1024;
-      canvas.height = 256;
+      canvas.height = 128;
 
-      context.fillStyle = 'black';
+      // Always use transparent background
+      context.fillStyle = 'rgba(0,0,0,0)';
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = 'white';
-      context.font = '64px sans-serif';
-      context.fillText(text, 50, 150);
+
+      context.fillStyle = 'lime';
+      context.font = '64px "Lucida Console", "Lucida Console Regular", monospace';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, canvas.width / 2, canvas.height / 2);
 
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, transparent: true });
-      const geometry = new THREE.PlaneGeometry(2, 0.5);
+      const geometry = new THREE.PlaneGeometry(3, 0.375);
       return new THREE.Mesh(geometry, material);
     }
 
     function updateTextMesh(text) {
       if (wsTextMesh) scene.remove(wsTextMesh);
       wsTextMesh = createTextMesh(text);
-      wsTextMesh.position.set(0, 2, -2);
+      wsTextMesh.position.set(0, -0.25, -2);
+      wsTextMesh.geometry.center();
       scene.add(wsTextMesh);
     }
 
     function connectWebSocket() {
-      const socket = new WebSocket('ws://localhost:8080');
+      const socket = new WebSocket('ws://localhost:8081');
       socket.onmessage = (event) => {
-        wsMessage = event.data;
-        updateTextMesh(wsMessage);
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "text" && typeof data.text === "string") {
+            wsMessage = data.text;
+            updateTextMesh(wsMessage, wsTextBgColor);
+          } else if (data.type === "toggle_transparency" && typeof data.transparent === "boolean") {
+            forceTransparent = data.transparent;
+          }
+        } catch (e) {
+          // Fallback for plain text messages
+          wsMessage = event.data;
+          updateTextMesh(wsMessage, wsTextBgColor);
+        }
       };
       socket.onopen = () => console.log("WebSocket connected");
       socket.onerror = (err) => console.error("WebSocket error", err);
@@ -428,9 +448,62 @@
     }
 
     connectWebSocket();
-    updateTextMesh(wsMessage);
+    updateTextMesh(wsMessage, wsTextBgColor);
 
     // --- End WebSocket Integration ---
+
+    // Animation loop
+    function animate() {
+      let phaseStart = performance.now();
+      let phase = 0; // 0: transparent, 1: opaque gray
+
+      renderer.setAnimationLoop(() => {
+        const now = performance.now();
+        const elapsed = (now - phaseStart) / 1000;
+
+        // Alternate every 5 seconds if not forced by WebSocket
+        if (forceTransparent === null && elapsed > 5) {
+          phase = (phase + 1) % 2;
+          phaseStart = now;
+
+          // Play ding exactly when opacity changes
+          audio.currentTime = 0;
+          audio.play().catch((err) => {
+            console.error('Error playing audio:', err);
+          });
+
+          // // Update wsTextMesh background to match sphere
+          // wsTextBgColor = (phase === 0) ? 'rgba(0,0,0,0)' : '#888888';
+          // updateTextMesh(wsMessage, wsTextBgColor);
+        }
+
+        // Determine transparency state
+        let transparent;
+        if (forceTransparent === null) {
+          transparent = (phase === 0);
+        } else {
+          transparent = forceTransparent;
+        }
+
+        // Set sphere and text background accordingly
+        if (transparent) {
+          sphereMaterial.uniforms.uOpacity.value = 0.0;
+          // wsTextBgColor = 'rgba(0,0,0,0)';
+        } else {
+          sphereMaterial.uniforms.uTopColor.value.copy(GRAY);
+          sphereMaterial.uniforms.uBottomColor.value.copy(GRAY);
+          sphereMaterial.uniforms.uOpacity.value = 0.99;
+          // wsTextBgColor = '#888888';
+        }
+
+        // // If transparency was forced, update text mesh background immediately
+        // if (forceTransparent !== null) {
+        //   updateTextMesh(wsMessage, wsTextBgColor);
+        // }
+
+        renderer.render(scene, camera);
+      });
+    }
 
     animate();
   </script>

@@ -7,7 +7,6 @@ from datetime import datetime
 import json
 import random
 
-
 HTTP_PORT = 8080
 WS_PORT = 8081
 
@@ -37,46 +36,30 @@ quantum_notes = [
     "temporal zoom",
     "Copenhagen"
 ]
-# 
-# Custom TCPServer to allow address reuse for HTTP
+
 class ReusableTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
 
-# Simple HTTP server to serve static files from current directory
 def start_http_server():
     Handler = http.server.SimpleHTTPRequestHandler
     with ReusableTCPServer(("", HTTP_PORT), Handler) as httpd:
         print(f"HTTP server running at http://localhost:{HTTP_PORT}/")
         httpd.serve_forever()
 
-# WebSocket server that sends JSON messages
+# Store all connected websockets
+connected_clients = set()
+
 async def ws_handler(websocket):
     print("WebSocket client connected")
-    # Send a welcome message as JSON
-    await websocket.send(json.dumps({"type": "text", "text": "Welcome to the WebXR WebSocket server!"}))
+    connected_clients.add(websocket)
     try:
-        count = 0
-        toggle = False
+        await websocket.send(json.dumps({"type": "text", "text": "Welcome to the WebXR WebSocket server!"}))
         while True:
-            now = datetime.now().strftime('%H:%M:%S')
-            # Every 10 seconds, send an audio message
-            if count == 4:
-                audio_msg = {"type": "audio", "file": "media/ding.mp3"}
-                await websocket.send(json.dumps(audio_msg))
-                
-                msg = {"type": "text", "text": f"{random.choice(quantum_notes)}"}
-                await websocket.send(json.dumps(msg))
-            if count == 5:
-                toggle = not toggle
-                count = 0
-                msg = {"type": "toggle_transparency", "transparent": str(toggle)}
-                await websocket.send(json.dumps(msg))            
-            count += 1
-            # msg = {"type": "text", "text": f"Message at {now}"}
-            # await websocket.send(json.dumps(msg))
             await asyncio.sleep(1)
     except websockets.ConnectionClosed:
         print("WebSocket client disconnected")
+    finally:
+        connected_clients.remove(websocket)
 
 async def run_ws_server():
     print(f"WebSocket server running at ws://localhost:{WS_PORT}/")
@@ -86,7 +69,6 @@ async def run_ws_server():
         ):
             await asyncio.Future()  # Run forever
     except TypeError:
-        # Fallback for older versions of websockets
         async with websockets.serve(
             ws_handler, "0.0.0.0", WS_PORT
         ):
@@ -95,10 +77,54 @@ async def run_ws_server():
 def start_ws_server():
     asyncio.run(run_ws_server())
 
+def input_loop():
+    import sys
+    import time
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    toggle = False
+    while True:
+        try:
+            cmd = input("Enter command (audio, text, pass): ").strip().lower()
+            if cmd == "audio":
+                msg = {"type": "audio", "file": "media/ding.mp3"}
+            elif cmd == "text":
+                text = input("Enter text (or leave blank for random quantum note): ").strip()
+                if not text:
+                    text = random.choice(quantum_notes)
+                msg = {"type": "text", "text": text}
+            elif cmd == "pass":
+                toggle = not toggle
+                msg = {"type": "toggle_transparency", "transparent": toggle}
+            else:
+                print("Unknown command. Use audio, text, or passthrough.")
+                continue
+
+            # Send to all connected clients
+            if connected_clients:
+                data = json.dumps(msg)
+                print(f"Sending: {data}")
+                for ws in list(connected_clients):
+                    coro = ws.send(data)
+                    try:
+                        asyncio.run_coroutine_threadsafe(coro, ws.loop)
+                    except Exception as e:
+                        print(f"Error sending to client: {e}")
+            else:
+                print("No clients connected.")
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting input loop.")
+            break
+        time.sleep(0.1)
+
 if __name__ == "__main__":
     # Start HTTP server in a separate thread
     http_thread = threading.Thread(target=start_http_server, daemon=True)
     http_thread.start()
 
-    # Start WebSocket server (blocks main thread)
-    start_ws_server()
+    # Start WebSocket server in a separate thread
+    ws_thread = threading.Thread(target=start_ws_server, daemon=True)
+    ws_thread.start()
+
+    # Start input loop in main thread
+    input_loop()

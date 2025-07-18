@@ -477,20 +477,20 @@
         }
 
         // Alternate every 5 seconds if not forced by WebSocket
-        if (forceTransparent === null && elapsed > 5) {
-          phase = (phase + 1) % 2;
-          phaseStart = now;
+        // if (forceTransparent === null && elapsed > 5) {
+        //   phase = (phase + 1) % 2;
+        //   phaseStart = now;
 
-          // // Play ding exactly when opacity changes
-          // audio.currentTime = 0;
-          // audio.play().catch((err) => {
-          //   console.error('Error playing audio:', err);
-          // });
+        //   // // Play ding exactly when opacity changes
+        //   // audio.currentTime = 0;
+        //   // audio.play().catch((err) => {
+        //   //   console.error('Error playing audio:', err);
+        //   // });
 
-          // // Update wsTextMesh background to match sphere
-          // wsTextBgColor = (phase === 0) ? 'rgba(0,0,0,0)' : '#888888';
-          // updateTextMesh(wsMessage, wsTextBgColor);
-        }
+        //   // // Update wsTextMesh background to match sphere
+        //   // wsTextBgColor = (phase === 0) ? 'rgba(0,0,0,0)' : '#888888';
+        //   // updateTextMesh(wsMessage, wsTextBgColor);
+        // }
 
         // Determine transparency state
         let transparent;

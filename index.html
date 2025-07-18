@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fish Sound Bath</title>
+  <title>QT Observer</title>
   <style>
     body {
       margin: 0;
@@ -392,10 +392,9 @@
     // --- WebSocket Integration ---
     let wsMessage = "Waiting for message...";
     let wsTextMesh = null;
-    let wsTextBgColor = '#888888'; // Track current background color
     let forceTransparent = null;   // null: auto, true: force transparent, false: force opaque
 
-    function createTextMesh(text, bgColor = 'rgba(0,0,0,0)') {
+    function createTextMesh(text) {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.width = 1024;
@@ -433,14 +432,14 @@
           const data = JSON.parse(event.data);
           if (data.type === "text" && typeof data.text === "string") {
             wsMessage = data.text;
-            updateTextMesh(wsMessage, wsTextBgColor);
+            updateTextMesh(wsMessage);
           } else if (data.type === "toggle_transparency" && typeof data.transparent === "boolean") {
             forceTransparent = data.transparent;
           }
         } catch (e) {
           // Fallback for plain text messages
           wsMessage = event.data;
-          updateTextMesh(wsMessage, wsTextBgColor);
+          updateTextMesh(wsMessage);
         }
       };
       socket.onopen = () => console.log("WebSocket connected");
@@ -449,7 +448,7 @@
     }
 
     connectWebSocket();
-    updateTextMesh(wsMessage, wsTextBgColor);
+    updateTextMesh(wsMessage);
 
     // --- End WebSocket Integration ---
 

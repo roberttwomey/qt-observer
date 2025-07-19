@@ -14,12 +14,14 @@
 </head>
 <body>
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
-    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/ARButton.js';
+    // import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+    // import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/webxr/ARButton.js';
     // import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/OBJLoader.js';
     // import { MTLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/loaders/MTLLoader.js';
-    import { OBJLoader } from './OBJLoader.js';
-    import { MTLLoader } from './MTLLoader.js';
+    import * as THREE from './libs/three.module.js';
+    import { ARButton } from './libs/ARButton.js';
+    import { OBJLoader } from './libs/OBJLoader.js';
+    import { MTLLoader } from './libs/MTLLoader.js';
 
     let doRotate = true;
     let stoppingRotation = false;

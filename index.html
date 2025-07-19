@@ -56,8 +56,8 @@
 
     // let LIGHTBLUE = new THREE.Color(0x87ceeb);
     // let DARKBLUE = new THREE.Color(0x00008b);
-    // let BLACK = new THREE.Color(0x000000);
-    let GRAY = new THREE.Color(0x888888);
+    let GRAY = new THREE.Color(0x000000);
+    // let GRAY = new THREE.Color(0x888888);
     
     const twoPi = 2 * Math.PI;
     // global clock
@@ -507,7 +507,7 @@
         } else {
           sphereMaterial.uniforms.uTopColor.value.copy(GRAY);
           sphereMaterial.uniforms.uBottomColor.value.copy(GRAY);
-          sphereMaterial.uniforms.uOpacity.value = 0.99;
+          sphereMaterial.uniforms.uOpacity.value = 1.0;//0.99;
           // wsTextBgColor = '#888888';
         }
 
